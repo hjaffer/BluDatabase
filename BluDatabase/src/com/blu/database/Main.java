@@ -31,9 +31,9 @@ public class Main {
 		// start PCB producer to produce messages in queue
 		new Thread(
 	        new DatabaseProducer(pcbFilenamesQueue, 
-                "C:/projects/BluDatabase/testData/PCB - Line Software", 
+                "/Users/hafeezjaffer/projects/testData/PCB - Line Software", 
                 NUM_CONSUMER_THREADS)).start();
-		  
+		
 		// start PCB consumers to consume messages from queue
 		for (int i = 0; i < NUM_CONSUMER_THREADS; i++) {
     		new Thread(
@@ -46,7 +46,7 @@ public class Main {
         // start SYS producer to produce messages in queue
         new Thread(
             new DatabaseProducer(sysFilenamesQueue, 
-                "C:/projects/BluDatabase/testData/System Test", 
+                "/Users/hafeezjaffer/projects/testData/System Test", 
                 NUM_CONSUMER_THREADS)).start();
           
         // start SYS consumers to consume messages from queue

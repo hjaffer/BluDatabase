@@ -121,16 +121,17 @@ public class PcbDatabaseConsumer extends DatabaseConsumer {
                         this.mConn.createStatement().executeUpdate(query);
                     }
                 } catch (FileNotFoundException e) {
-                    LOGGER.severe(e.getStackTrace().toString());
+                    LOGGER.severe(e.toString());
                 } catch (IOException e) {
-                    LOGGER.severe(e.getStackTrace().toString());
+                    LOGGER.severe(e.toString());
                 }
             }
          } catch(InterruptedException e) {
-             LOGGER.severe(e.getStackTrace().toString());
+             LOGGER.severe(e.toString());
          } catch (ClassNotFoundException | SQLException e) {
-             LOGGER.severe(e.getStackTrace().toString());
+             LOGGER.severe(e.toString());
          }
+         LOGGER.info("PCB Consumer finished.");
     }
 }
 
@@ -141,7 +142,7 @@ public class PcbDatabaseConsumer extends DatabaseConsumer {
 
 CREATE TABLE public.pcb_test_logs
 (
-  id integer NOT NULL DEFAULT nextval('pcb_test_logs_id_seq'::regclass),
+  id SERIAL PRIMARY KEY,
   "Error Code" smallint,
   "Error Description" character varying(256),
   "TimeStamp" timestamp without time zone,
@@ -180,8 +181,7 @@ CREATE TABLE public.pcb_test_logs
   "Red Led On Reading" smallint,
   "Red Led On Threshold" smallint,
   "Log Filename" character varying(256),
-  "Log Title" character varying(256),
-  CONSTRAINT pcb_test_logs_pkey PRIMARY KEY (id)
+  "Log Title" character varying(256)
 )
 WITH (
   OIDS=FALSE

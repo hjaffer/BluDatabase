@@ -152,16 +152,17 @@ public class SysDatabaseConsumer extends DatabaseConsumer {
                         this.mConn.createStatement().executeUpdate(query);
                     }
                 } catch (FileNotFoundException e) {
-                    LOGGER.severe(e.getStackTrace().toString());
+                    LOGGER.severe(e.toString());
                 } catch (IOException e) {
-                    LOGGER.severe(e.getStackTrace().toString());
+                    LOGGER.severe(e.toString());
                 }
             }
          } catch(InterruptedException e) {
-             LOGGER.severe(e.getStackTrace().toString());
+             LOGGER.severe(e.toString());
          } catch (ClassNotFoundException | SQLException e) {
-             LOGGER.severe(e.getStackTrace().toString());
+             LOGGER.severe(e.toString());
          }
+         LOGGER.info("SYS Consumer finished.");
     }
     
     private static void dumpString(String text)
@@ -176,6 +177,7 @@ public class SysDatabaseConsumer extends DatabaseConsumer {
 /*
 CREATE TABLE public.sys_test_logs
 (
+  id SERIAL PRIMARY KEY,
   "Date" date,
   "Time" time without time zone,
   "Firmware Version" real,
