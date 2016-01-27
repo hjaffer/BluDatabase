@@ -7,6 +7,7 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.sql.SQLException;
+import java.util.Arrays;
 import java.util.concurrent.BlockingQueue;
 import java.util.logging.FileHandler;
 import java.util.logging.Logger;
@@ -28,13 +29,18 @@ public class PcbDatabaseConsumer extends DatabaseConsumer {
 
     @Override
     public void run() {
-         try {
+        try {
             // connect to the database
             this.connect();
             LOGGER.info("Successfully connected to the database");
-                        
-            // consume messages until exit file is received
-            while (true) {
+        } catch (ClassNotFoundException | SQLException e) {
+            LOGGER.severe(e.toString());
+        }
+        
+        // consume messages until exit file is received
+        String query = null;
+        while (true) {
+            try {
                 File curFile = mFilenameQueue.take();
                 String curFilename = curFile.getName();
                 String curFileAbsPath = curFile.getAbsolutePath();
@@ -84,6 +90,13 @@ public class PcbDatabaseConsumer extends DatabaseConsumer {
                         LOGGER.severe("Error processing keys: " + keys);
                         continue;
                     }
+
+                    // add the "Current Tester ID" if not present
+                    boolean curTesterIdPresent = true;
+                    if (!keys.contains("Current Tester ID")) {
+                        keys = keys.replace("Prev Tester ID", "Prev Tester ID,Current Tester ID");
+                        curTesterIdPresent = false;
+                    }
                     
                     String[] arrKeys = keys.split(",");
                     StringBuilder keyBldr = new StringBuilder();
@@ -97,12 +110,28 @@ public class PcbDatabaseConsumer extends DatabaseConsumer {
                     String curDataLine;
                     StringBuilder valBldr = new StringBuilder();
                     while ((curDataLine = br.readLine()) != null) {
+                        // finished processing the file (below is summary information)
+                        if (curDataLine.contains(",,,,,")) {
+                            break;
+                        }
+                        
+                        if (!curTesterIdPresent) {
+                            int insNdx = nthIndexOf(curDataLine, ',', 6);
+                            curDataLine = curDataLine.substring(0, insNdx) + 
+                                          ",-1" + 
+                                          curDataLine.substring(
+                                              insNdx, curDataLine.length());
+                        }
+                        
                         String[] arrVals = curDataLine.split(",");
                         
                         // make sure the keys and values match
-                        if (arrVals.length != arrKeys.length) {
-                            LOGGER.severe("Error processing line: " + 
-                                          curDataLine);
+                        if (arrKeys.length != arrVals.length) {
+                            LOGGER.severe(arrKeys.length + "!=" +
+                                arrVals.length + ", Error processing line: " + 
+                                curDataLine);
+                            LOGGER.severe(Arrays.toString(arrKeys));
+                            
                             continue;
                         }
                         
@@ -114,24 +143,45 @@ public class PcbDatabaseConsumer extends DatabaseConsumer {
                         valBldr.append("'" + logFileTitle + "'");
                         
                         // insert the data into the database
-                        String query = 
+                        query = 
                             String.format("INSERT INTO %s (%s) VALUES (%s)", 
                                           mTable, keyBldr.toString(), 
                                           valBldr.toString());
-                        this.mConn.createStatement().executeUpdate(query);
+                        // System.out.println(query);
+                        try {
+                            this.mConn.createStatement().executeUpdate(query);
+                        } catch (SQLException e) {
+                            LOGGER.severe(e.toString());
+                            LOGGER.severe("Query is: " + query);
+                        }
                     }
                 } catch (FileNotFoundException e) {
                     LOGGER.severe(e.toString());
                 } catch (IOException e) {
                     LOGGER.severe(e.toString());
                 }
+            } catch(InterruptedException e) {
+                LOGGER.severe(e.toString());
+            } catch (SQLException e) {
+                LOGGER.severe(e.toString());
+                LOGGER.severe("Query is: " + query);
             }
-         } catch(InterruptedException e) {
-             LOGGER.severe(e.toString());
-         } catch (ClassNotFoundException | SQLException e) {
-             LOGGER.severe(e.toString());
-         }
-         LOGGER.info("PCB Consumer finished.");
+        }
+        LOGGER.info("PCB Consumer finished.");
+    }
+    
+    public static int nthIndexOf(String text, char needle, int n)
+    {
+        for (int i = 0; i < text.length(); i++) {
+            if (text.charAt(i) == needle) {
+                n--;
+                if (n == 0) {
+                    return i;
+                }
+            }
+        }
+        
+        return -1;
     }
 }
 
@@ -146,14 +196,14 @@ CREATE TABLE public.pcb_test_logs
   "Error Code" smallint,
   "Error Description" character varying(256),
   "TimeStamp" timestamp without time zone,
-  "Serial No" integer,
+  "Serial No" character varying(32),
   "Re-test" boolean,
   "Prev Tester ID" smallint,
   "Current Tester ID" smallint,
   "Software Ver." character varying(16),
   "Fixture Firmware Ver." character varying(16),
   "UUT Firmware Ver." character varying(16),
-  "Operator ID" character varying(32),
+  "Operator ID" character varying(100),
   "Board Rev" smallint,
   "Limits File" character varying(256),
   "Limits File Version" character varying(16),
@@ -163,7 +213,7 @@ CREATE TABLE public.pcb_test_logs
   "Min Cal Factor" real,
   "Cal Factor" real,
   "Max Cal Factor" real,
-  "Min Cig Detect Voltage" smallint,
+  "Min Cig Detect Voltage" real,
   "Cig Detect Voltage" real,
   "Max Cig Detect Voltage" real,
   "Min Cig Battery Voltage" real,

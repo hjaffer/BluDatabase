@@ -28,10 +28,12 @@ public class Main {
             LOGGER.severe(e.getStackTrace().toString());
         }
 
+		/*
 		// start PCB producer to produce messages in queue
 		new Thread(
 	        new DatabaseProducer(pcbFilenamesQueue, 
-                "/Users/hafeezjaffer/projects/testData/PCB - Line Software", 
+                "C:/projects/rar_test/Production Test Logs/AAI/Kirstie - CH1410/PCB - Line Software", 
+	            //"C:/projects/rar_test2",
                 NUM_CONSUMER_THREADS)).start();
 		
 		// start PCB consumers to consume messages from queue
@@ -42,11 +44,13 @@ public class Main {
         			DbContract.PASSWORD, DbContract.PCB_TESTS_TABLE, 
         			pcbFilenamesQueue)).start();
 		}
+		*/
 		
         // start SYS producer to produce messages in queue
         new Thread(
             new DatabaseProducer(sysFilenamesQueue, 
-                "/Users/hafeezjaffer/projects/testData/System Test", 
+                "C:/projects/rar_test/Production Test Logs/AAI/Kirstie - CH1410/System Test",
+                //"C:/projects/rar_test2",
                 NUM_CONSUMER_THREADS)).start();
           
         // start SYS consumers to consume messages from queue

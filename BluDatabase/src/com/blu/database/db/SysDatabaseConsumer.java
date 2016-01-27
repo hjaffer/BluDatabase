@@ -40,13 +40,18 @@ public class SysDatabaseConsumer extends DatabaseConsumer {
 
     @Override
     public void run() {
-         try {
+        try {
             // connect to the database
             this.connect();
             LOGGER.info("Successfully connected to the database");
-                        
-            // consume messages until exit file is received
-            while (true) {
+        } catch (ClassNotFoundException | SQLException e) {
+            LOGGER.severe(e.toString());
+        }
+        
+        // consume messages until exit file is received
+        String query = null;
+        while (true) {
+            try {
                 File curFile = mFilenameQueue.take();
                 String curFilename = curFile.getName();
                 String curFileAbsPath = curFile.getAbsolutePath();
@@ -78,7 +83,14 @@ public class SysDatabaseConsumer extends DatabaseConsumer {
                     
                     String[] arrKeys = keys.split(",");
                     StringBuilder keyBldr = new StringBuilder();
-                    for (int kNdx = 0; kNdx < arrKeys.length - 2; kNdx++) {
+                    boolean oldFileFormat = (arrKeys.length == 17);
+                    boolean newFileFormat = (arrKeys.length == 28);
+                    
+                    int numArrKeys = (oldFileFormat ? arrKeys.length - 2 : arrKeys.length - 12);
+                    for (int kNdx = 0; kNdx < numArrKeys; kNdx++) { // 12
+                        if (arrKeys[kNdx].trim().isEmpty()) {
+                            continue;
+                        }
                         keyBldr.append("\"" + arrKeys[kNdx].trim() + "\",");
                     }
                     keyBldr.append("\"Machine Serial\",");
@@ -100,18 +112,22 @@ public class SysDatabaseConsumer extends DatabaseConsumer {
                         
                         // make sure there are the correct number of values
                         if (arrVals.length != NUM_DATA_VALS_WITHOUT_MFG_TESTS && 
-                                arrVals.length != NUM_DATA_VALS_WITH_MFG_TESTS) {
-                            LOGGER.severe("Error processing line: " + curDataLine);
+                                !oldFileFormat && !newFileFormat) {
+                            LOGGER.severe(arrVals.length + 
+                                ", Error processing line: " + curDataLine);
                             continue;
                         }
                         
                         valBldr.setLength(0);
-                        for (int valNdx = 0; valNdx < arrVals.length; valNdx++) {
+                        int numArrVals = oldFileFormat ? arrVals.length : arrVals.length - 1; 
+                        for (int valNdx = 0; valNdx < numArrVals; valNdx++) {
                             String curVal = arrVals[valNdx];
+                            
                             if (valNdx == COLUMN_NDX_TIME) {
                                 curVal = curVal.replaceAll("\u4e0a", "A");
                                 curVal = curVal.replaceAll("\u4e0b", "P");
                                 curVal = curVal.replaceAll("\u5348", "M");
+                                curVal = curVal.replaceAll("\ufffd\ufffd\ufffd\ufffd", "AM");
                             }
                             
                             if (valNdx == COLUMN_NDX_BUILD_DATE_STRING) {
@@ -145,24 +161,30 @@ public class SysDatabaseConsumer extends DatabaseConsumer {
                         valBldr.append("'" + curFilename + "'");
                         
                         // insert the data into the database
-                        String query = 
+                        query = 
                             String.format("INSERT INTO %s (%s) VALUES (%s)", 
-                                          mTable, keyBldr.toString(), 
-                                          valBldr.toString());
-                        this.mConn.createStatement().executeUpdate(query);
+                                mTable, keyBldr.toString(), valBldr.toString());
+                        // System.out.println(query);
+                        try {
+                            this.mConn.createStatement().executeUpdate(query);
+                        } catch (SQLException e) {
+                            LOGGER.severe(e.toString());
+                            LOGGER.severe("Query is: " + query);
+                        }
                     }
                 } catch (FileNotFoundException e) {
                     LOGGER.severe(e.toString());
                 } catch (IOException e) {
                     LOGGER.severe(e.toString());
                 }
+            } catch(InterruptedException e) {
+                LOGGER.severe(e.toString());
+            } catch (SQLException e) {
+                LOGGER.severe(e.toString());
+                LOGGER.severe("Query is: " + query);
             }
-         } catch(InterruptedException e) {
-             LOGGER.severe(e.toString());
-         } catch (ClassNotFoundException | SQLException e) {
-             LOGGER.severe(e.toString());
-         }
-         LOGGER.info("SYS Consumer finished.");
+        }
+        LOGGER.info("SYS Consumer finished.");
     }
     
     private static void dumpString(String text)
@@ -175,13 +197,18 @@ public class SysDatabaseConsumer extends DatabaseConsumer {
 }
 
 /*
+
+-- Table: public.sys_test_logs
+
+-- DROP TABLE public.sys_test_logs;
+
 CREATE TABLE public.sys_test_logs
 (
   id SERIAL PRIMARY KEY,
   "Date" date,
   "Time" time without time zone,
   "Firmware Version" real,
-  "Serial Number" integer,
+  "Serial Number" character varying(32),
   "Build Date String" character varying(32),
   "Board Revision" smallint,
   "Tester ID" smallint,
